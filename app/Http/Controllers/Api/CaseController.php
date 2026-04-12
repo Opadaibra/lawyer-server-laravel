@@ -24,6 +24,24 @@ class CaseController extends Controller
     }
 
     /**
+     * جلب جميع جلسات القضايا
+     */
+    public function allSessions()
+    {
+        $casesIds = CaseFile::whereIn('user_id', auth()->user()->office_users_ids)->pluck('id');
+        
+        $sessions = \App\Models\CaseSession::whereIn('case_file_id', $casesIds)
+                        ->with(['caseFile:id,case_number,court,client_id', 'caseFile.client:id,name'])
+                        ->orderBy('date', 'desc')
+                        ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $sessions
+        ]);
+    }
+
+    /**
      * إنشاء دعوى جديدة
      */
     public function store(Request $request)

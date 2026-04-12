@@ -105,6 +105,49 @@ class ClientController extends Controller
         ]);
     }
 
+    // GET /client-portal/fees - جلب أتعاب الموكل
+    public function portalFees()
+    {
+        $user = Auth::user();
+        if ($user->role !== 'CLIENT') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized'
+            ], 403);
+        }
+
+        $clientRecord = Client::where('client_user_id', $user->id)->first();
+        if (!$clientRecord) {
+             return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'total_fees' => 0,
+                    'total_paid' => 0, // In case total_fees_payments represents paid
+                    'fees_records' => []
+                ]
+            ]);
+        }
+
+        $caseIds = $clientRecord->cases()->pluck('id');
+        
+        $fees = \App\Models\Fee::whereIn('case_file_id', $caseIds)
+            ->with('caseFile:id,case_number,court,total_fees_payments')
+            ->orderBy('date', 'desc')
+            ->get();
+
+        $totalFeesAmount = $fees->sum('value');
+        $totalPaidAmount = $clientRecord->cases()->sum('total_fees_payments');
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'total_fees' => $totalFeesAmount,
+                'total_paid' => $totalPaidAmount,
+                'fees_records' => $fees
+            ]
+        ]);
+    }
+
     // GET /clients/{id} - جلب موكل واحد
     public function show($id)
     {

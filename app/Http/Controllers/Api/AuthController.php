@@ -37,6 +37,15 @@ class AuthController extends Controller
             'role' => $request->role ?? 'LAWYER'
         ]);
 
+        // إذا كان المستخدم محامياً، ننشئ له مكتباً ونربطه به
+        if ($user->role === 'LAWYER') {
+            $office = \App\Models\Office::create([
+                'name' => 'مكتب ' . $user->name,
+            ]);
+            
+            $user->update(['office_id' => $office->id]);
+        }
+
         $token = Auth::login($user);
 
         return response()->json([

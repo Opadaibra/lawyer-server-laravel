@@ -21,13 +21,20 @@ Route::get('me', [AuthController::class, 'me'])->middleware('auth:api');
 
 // Protected routes
 Route::middleware('auth:api')->group(function () {
-
+    
+    // Notifications Route
+    Route::get('notifications', [\App\Http\Controllers\AppNotificationController::class, 'index']);
+    Route::post('notifications', [\App\Http\Controllers\AppNotificationController::class, 'store']);
+    Route::patch('notifications/{id}/read', [\App\Http\Controllers\AppNotificationController::class, 'markAsRead']);
 
     // ===== CLIENTS =====
     Route::apiResource('clients', ClientController::class);
     Route::get('clients/search/{query}', [ClientController::class, 'search']);
     Route::get('clients/{id}/cases', [ClientController::class, 'cases']);
     Route::get('client-portal/cases', [ClientController::class, 'portalCases']);
+    Route::get('client-portal/fees', [ClientController::class, 'portalFees']);
+    Route::get('client-portal/notifications', [\App\Http\Controllers\AppNotificationController::class, 'clientNotifications']);
+    Route::patch('client-portal/notifications/{id}/read', [\App\Http\Controllers\AppNotificationController::class, 'clientMarkAsRead']);
 
 
 
@@ -46,6 +53,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/files/by-task/{taskId}', [FileController::class, 'getFilesByTask']);
 
     // Case routes  
+    Route::get('cases/all-sessions', [CaseController::class, 'allSessions']);
     Route::apiResource('cases', CaseController::class);
     Route::post('cases/{id}/archive', [CaseController::class, 'archive']);
     Route::post('cases/{id}/unarchive', [CaseController::class, 'unarchive']);

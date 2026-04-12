@@ -24,7 +24,7 @@ class Task extends Model
     ];
 
     protected $casts = [
-        'due_date' => 'date',
+        'due_date' => 'datetime',
         'next_session_date' => 'date',
         'archived_at' => 'datetime'
     ];
