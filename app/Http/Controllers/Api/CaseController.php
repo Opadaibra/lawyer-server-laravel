@@ -13,12 +13,18 @@ class CaseController extends Controller
     /**
      * عرض جميع الدعاوى للمستخدم الحالي
      */
-    public function index()
+    public function index(Request $request)
     {
-        $cases = CaseFile::whereIn('user_id', auth()->user()->office_users_ids)
-                        ->with(['client', 'tasks', 'minutes', 'files'])
-                        ->latest()
-                        ->get();
+        $query = CaseFile::whereIn('user_id', auth()->user()->office_users_ids)
+                        ->with(['client', 'tasks', 'minutes', 'files']);
+
+        if ($request->has('archived') && $request->archived) {
+            $query->whereNotNull('archived_at');
+        } else {
+            $query->whereNull('archived_at');
+        }
+
+        $cases = $query->latest()->get();
 
         return response()->json($cases);
     }
@@ -30,10 +36,16 @@ class CaseController extends Controller
     {
         $casesIds = CaseFile::whereIn('user_id', auth()->user()->office_users_ids)->pluck('id');
         
-        $sessions = \App\Models\CaseSession::whereIn('case_file_id', $casesIds)
-                        ->with(['caseFile:id,case_number,court,client_id', 'caseFile.client:id,name'])
-                        ->orderBy('date', 'desc')
-                        ->get();
+        $query = \App\Models\CaseSession::whereIn('case_file_id', $casesIds)
+                        ->with(['caseFile:id,case_number,court,client_id', 'caseFile.client:id,name']);
+
+        if (request()->has('archived') && request()->archived) {
+            $query->whereNotNull('archived_at');
+        } else {
+            $query->whereNull('archived_at');
+        }
+
+        $sessions = $query->orderBy('date', 'desc')->get();
 
         return response()->json([
             'status' => 'success',

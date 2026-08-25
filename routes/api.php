@@ -16,12 +16,21 @@ use App\Http\Controllers\Api\OfficeController;
 // Auth routes
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
+Route::post('refresh', [AuthController::class, 'refresh']);
 Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:api');
 Route::get('me', [AuthController::class, 'me'])->middleware('auth:api');
+Route::post('update-profile-picture', [AuthController::class, 'updateProfilePicture'])->middleware('auth:api');
+
+// Password Reset Routes (OTP)
+Route::post('forgot-password/send-otp', [AuthController::class, 'sendOtp']);
+Route::post('forgot-password/verify-otp', [AuthController::class, 'verifyOtp']);
+Route::post('forgot-password/reset', [AuthController::class, 'resetPasswordWithOtp']);
 
 // Protected routes
 Route::middleware('auth:api')->group(function () {
-    
+
+     Route::post('/change-password', [AuthController::class, 'changePassword']);
+        
     // Notifications Route
     Route::get('notifications', [\App\Http\Controllers\AppNotificationController::class, 'index']);
     Route::post('notifications', [\App\Http\Controllers\AppNotificationController::class, 'store']);
@@ -29,12 +38,14 @@ Route::middleware('auth:api')->group(function () {
 
     // ===== CLIENTS =====
     Route::apiResource('clients', ClientController::class);
+    Route::post('clients/{id}/upload-profile-picture', [ClientController::class, 'uploadProfilePicture']);
     Route::get('clients/search/{query}', [ClientController::class, 'search']);
     Route::get('clients/{id}/cases', [ClientController::class, 'cases']);
     Route::get('client-portal/cases', [ClientController::class, 'portalCases']);
     Route::get('client-portal/fees', [ClientController::class, 'portalFees']);
     Route::get('client-portal/notifications', [\App\Http\Controllers\AppNotificationController::class, 'clientNotifications']);
     Route::patch('client-portal/notifications/{id}/read', [\App\Http\Controllers\AppNotificationController::class, 'clientMarkAsRead']);
+    Route::put('clients/{id}/change-password', [ClientController::class, 'changePassword']);
 
 
 
@@ -90,6 +101,9 @@ Route::middleware('auth:api')->group(function () {
 
     // Individual Resource Management (Update/Delete)
     Route::match(['put', 'patch'], 'sessions/{id}', [\App\Http\Controllers\Api\CaseSessionController::class, 'update']);
+    Route::post('sessions/{id}/postpone', [\App\Http\Controllers\Api\CaseSessionController::class, 'postpone']);
+    Route::post('sessions/{id}/archive', [\App\Http\Controllers\Api\CaseSessionController::class, 'archive']);
+    Route::post('sessions/{id}/unarchive', [\App\Http\Controllers\Api\CaseSessionController::class, 'unarchive']);
     Route::delete('sessions/{id}', [\App\Http\Controllers\Api\CaseSessionController::class, 'destroy']);
     Route::delete('notes/{id}', [\App\Http\Controllers\Api\CaseNoteController::class, 'destroy']);
     Route::delete('expenses/{id}', [\App\Http\Controllers\Api\ExpenseController::class, 'destroy']);
@@ -101,8 +115,9 @@ Route::middleware('auth:api')->group(function () {
     // Team management (Admins only)
     Route::get('team', [\App\Http\Controllers\Api\TeamController::class, 'index']);
     Route::post('team', [\App\Http\Controllers\Api\TeamController::class, 'store']);
+    Route::put('team/{id}', [\App\Http\Controllers\Api\TeamController::class, 'update']);  // <-- إضافة تعديل معلومات العضو
+    Route::put('team/{id}/change-password', [\App\Http\Controllers\Api\TeamController::class, 'changePassword']);  // <-- إضافة تغيير كلمة المرور
     Route::delete('team/{id}', [\App\Http\Controllers\Api\TeamController::class, 'destroy']);
-
 
     // Office Routes
     Route::prefix('offices')->group(function () {

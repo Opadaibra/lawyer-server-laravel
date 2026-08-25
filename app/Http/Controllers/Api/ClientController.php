@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 
 class ClientController extends Controller
 {
@@ -17,9 +18,9 @@ class ClientController extends Controller
     public function index()
     {
         $clients = Client::whereIn('user_id', Auth::user()->office_users_ids)
-                        ->with('cases')
-                        ->latest()
-                        ->get();
+            ->with('cases')
+            ->latest()
+            ->get();
 
         return response()->json([
             'status' => 'success',
@@ -75,6 +76,7 @@ class ClientController extends Controller
         ], 201);
     }
 
+
     // GET /client-portal/cases - جلب دعاوى الموكل (لحساب الموكل)
     public function portalCases()
     {
@@ -88,16 +90,16 @@ class ClientController extends Controller
 
         $clientRecord = Client::where('client_user_id', $user->id)->first();
         if (!$clientRecord) {
-             return response()->json([
+            return response()->json([
                 'status' => 'success',
                 'data' => []
             ]);
         }
 
         $cases = $clientRecord->cases()
-                        ->with(['tasks', 'minutes', 'files', 'sessions'])
-                        ->latest()
-                        ->get();
+            ->with(['tasks', 'minutes', 'files', 'sessions'])
+            ->latest()
+            ->get();
 
         return response()->json([
             'status' => 'success',
@@ -118,7 +120,7 @@ class ClientController extends Controller
 
         $clientRecord = Client::where('client_user_id', $user->id)->first();
         if (!$clientRecord) {
-             return response()->json([
+            return response()->json([
                 'status' => 'success',
                 'data' => [
                     'total_fees' => 0,
@@ -129,7 +131,7 @@ class ClientController extends Controller
         }
 
         $caseIds = $clientRecord->cases()->pluck('id');
-        
+
         $fees = \App\Models\Fee::whereIn('case_file_id', $caseIds)
             ->with('caseFile:id,case_number,court,total_fees_payments')
             ->orderBy('date', 'desc')
@@ -147,15 +149,16 @@ class ClientController extends Controller
             ]
         ]);
     }
-
     // GET /clients/{id} - جلب موكل واحد
     public function show($id)
     {
         $client = Client::whereIn('user_id', Auth::user()->office_users_ids)
-                        ->with(['cases' => function($query) {
-                            $query->with(['tasks', 'minutes', 'files']);
-                        }])
-                        ->find($id);
+            ->with([
+                'cases' => function ($query) {
+                    $query->with(['tasks', 'minutes', 'files']);
+                }
+            ])
+            ->find($id);
 
         if (!$client) {
             return response()->json([
@@ -199,7 +202,12 @@ class ClientController extends Controller
         }
 
         $client->update($request->only([
-            'name', 'phone', 'email', 'address', 'notes', 'power_of_attorney_number'
+            'name',
+            'phone',
+            'email',
+            'address',
+            'notes',
+            'power_of_attorney_number'
         ]));
 
         return response()->json([
@@ -241,13 +249,13 @@ class ClientController extends Controller
     public function search($query)
     {
         $clients = Client::whereIn('user_id', Auth::user()->office_users_ids)
-                        ->where(function($q) use ($query) {
-                            $q->where('name', 'LIKE', "%{$query}%")
-                              ->orWhere('phone', 'LIKE', "%{$query}%")
-                              ->orWhere('email', 'LIKE', "%{$query}%");
-                        })
-                        ->with('cases')
-                        ->get();
+            ->where(function ($q) use ($query) {
+                $q->where('name', 'LIKE', "%{$query}%")
+                    ->orWhere('phone', 'LIKE', "%{$query}%")
+                    ->orWhere('email', 'LIKE', "%{$query}%");
+            })
+            ->with('cases')
+            ->get();
 
         return response()->json([
             'status' => 'success',
@@ -268,13 +276,110 @@ class ClientController extends Controller
         }
 
         $cases = $client->cases()
-                        ->with(['tasks', 'minutes', 'files'])
-                        ->latest()
-                        ->get();
+            ->with(['tasks', 'minutes', 'files'])
+            ->latest()
+            ->get();
 
         return response()->json([
             'status' => 'success',
             'data' => $cases
+        ]);
+    }
+
+    // POST /api/clients/{id}/upload-profile-picture
+    public function uploadProfilePicture(Request $request, $id)
+    {
+        $client = Client::whereIn('user_id', Auth::user()->office_users_ids)->find($id);
+
+        if (!$client) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Client not found'
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Delete old picture if exists
+        if ($client->profile_picture) {
+            Storage::disk('public')->delete($client->profile_picture);
+        }
+
+        // Store new picture
+        $path = $request->file('image')->store('client_profiles', 'public');
+
+        $client->update([
+            'profile_picture' => $path
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Client profile picture updated successfully',
+            'profile_picture_url' => $client->profile_picture_url,
+            'data' => $client
+        ]);
+    }
+
+    /**
+     * PUT /api/clients/{id}/change-password
+     * تغيير كلمة مرور الموكل (بدون OTP)
+     */
+    public function changePassword(Request $request, $id)
+    {
+        // التحقق من وجود الموكل وصلاحيات المكتب
+        $client = Client::whereIn('user_id', Auth::user()->office_users_ids)->find($id);
+
+        if (!$client) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Client not found'
+            ], 404);
+        }
+
+        // التحقق من صحة البيانات
+        $validator = Validator::make($request->all(), [
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // البحث عن حساب المستخدم المرتبط بالموكل
+        $user = User::find($client->client_user_id);
+
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User account not found for this client'
+            ], 404);
+        }
+
+        // تحديث كلمة المرور
+        $user->update([
+            'password' => Hash::make($request->password)
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Client password changed successfully',
+            'data' => [
+                'client_id' => $client->id,
+                'client_name' => $client->name,
+                'email' => $user->email
+            ]
         ]);
     }
 }

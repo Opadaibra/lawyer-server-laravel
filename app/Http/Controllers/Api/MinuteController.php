@@ -65,7 +65,7 @@ class MinuteController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'case_file_id' => 'required|exists:case_files,id',
+            'case_file_id' => 'nullable|exists:case_files,id',
             'title' => 'required|string|max:255',
             'content' => 'required|string',
             'date' => 'nullable|date',
@@ -85,15 +85,17 @@ class MinuteController extends Controller
         }
 
         // التحقق من أن القضية تخص المستخدم
-        $case = CaseFile::whereIn('user_id', Auth::user()->office_users_ids)
-            ->where('id', $request->case_file_id)
-            ->first();
+        if ($request->filled('case_file_id')) {
+            $case = CaseFile::whereIn('user_id', Auth::user()->office_users_ids)
+                ->where('id', $request->case_file_id)
+                ->first();
 
-        if (!$case) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Case not found or does not belong to you'
-            ], 403);
+            if (!$case) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Case not found or does not belong to you'
+                ], 403);
+            }
         }
 
         // استخدم only أو array مباشرة

@@ -16,8 +16,23 @@ class User extends Authenticatable implements JWTSubject
         'email',
         'password',
         'role',
-        'office_id'
+        'office_id',
+        'profile_picture',
+        'otp',
+        'otp_expires_at',
+        'last_otp_requested_at',
+        'otp_request_count'
     ];
+
+    protected $appends = ['profile_picture_url'];
+
+    public function getProfilePictureUrlAttribute()
+    {
+        if ($this->profile_picture) {
+            return asset('storage/' . $this->profile_picture);
+        }
+        return null;
+    }
 
     protected $hidden = [
         'password',
@@ -27,6 +42,7 @@ class User extends Authenticatable implements JWTSubject
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed', // هذا يساعد في Laravel 10+
+        'last_otp_requested_at' => 'datetime',
     ];
 
     // JWT Methods

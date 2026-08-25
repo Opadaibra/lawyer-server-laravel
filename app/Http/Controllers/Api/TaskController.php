@@ -28,7 +28,7 @@ class TaskController extends Controller
         }
 
         $query = Task::whereIn('user_id', Auth::user()->office_users_ids)
-            ->with(['case', 'files']);
+            ->with(['case.client', 'files']);
 
         // فلترة حسب الحالة
         if ($request->has('status')) {
@@ -47,6 +47,9 @@ class TaskController extends Controller
             } else {
                 $query->whereNull('archived_at');
             }
+        } else {
+            // بالوضع الافتراضي لا تظهر المهام المؤرشفة إلا إذا طُلبت
+            $query->whereNull('archived_at');
         }
 
         $tasks = $query->latest()->get();
@@ -105,13 +108,14 @@ class TaskController extends Controller
             'task_type' => $request->task_type,
             'next_session_date' => $request->next_session_date,
             'notes' => $request->notes,
-            'status' => $request->status ?? 'pending'
+            'status' => $request->status ?? 'pending',
+            'archived_at' => ($request->status === 'completed') ? now() : null
         ]);
 
         return response()->json([
             'status' => 'success',
             'message' => 'Task created successfully',
-            'data' => $task->load(['case', 'files'])
+            'data' => $task->load(['case.client', 'files'])
         ], 201);
     }
 
@@ -122,7 +126,7 @@ class TaskController extends Controller
     public function show($id)
     {
         $task = Task::whereIn('user_id', Auth::user()->office_users_ids)
-            ->with(['case', 'files'])
+            ->with(['case.client', 'files'])
             ->find($id);
 
         if (!$task) {
@@ -185,22 +189,28 @@ class TaskController extends Controller
             }
         }
 
-        $task->update($request->only([
+        $data = $request->only([
             'case_file_id',
             'title',
             'description',
-            'due_date',
             'due_date',
             'status',
             'task_type',
             'next_session_date',
             'notes'
-        ]));
+        ]);
+
+        // الأرشفة التلقائية إذا كانت مكتملة
+        if (isset($data['status']) && $data['status'] === 'completed' && !$task->archived_at) {
+            $data['archived_at'] = now();
+        }
+
+        $task->update($data);
 
         return response()->json([
             'status' => 'success',
             'message' => 'Task updated successfully',
-            'data' => $task->fresh(['case', 'files'])
+            'data' => $task->fresh(['case.client', 'files'])
         ]);
     }
 
@@ -386,7 +396,7 @@ class TaskController extends Controller
             ->where('due_date', '>=', now())
             ->where('due_date', '<=', now()->addDays(7))
             ->whereIn('status', ['pending', 'in_progress'])
-            ->with(['case'])
+            ->with(['case.client'])
             ->orderBy('due_date')
             ->get();
 
@@ -408,7 +418,7 @@ class TaskController extends Controller
             ->whereNotNull('due_date')
             ->where('due_date', '<', now())
             ->whereIn('status', ['pending', 'in_progress'])
-            ->with(['case'])
+            ->with(['case.client'])
             ->orderBy('due_date')
             ->get();
 
@@ -434,11 +444,14 @@ class TaskController extends Controller
             ], 404);
         }
 
-        $task->update(['status' => 'completed']);
+        $task->update([
+            'status' => 'completed',
+            'archived_at' => now()
+        ]);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Task marked as completed',
+            'message' => 'Task marked as completed and archived',
             'data' => $task
         ]);
     }

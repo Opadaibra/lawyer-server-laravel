@@ -18,8 +18,19 @@ class Client extends Model
         'email',
         'address',
         'notes',
-        'power_of_attorney_number'
+        'power_of_attorney_number',
+        'profile_picture'
     ];
+
+    protected $appends = ['profile_picture_url'];
+
+    public function getProfilePictureUrlAttribute()
+    {
+        if ($this->profile_picture) {
+            return asset('storage/' . $this->profile_picture);
+        }
+        return null;
+    }
 
     protected $dates = ['deleted_at'];
 

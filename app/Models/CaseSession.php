@@ -10,11 +10,13 @@ class CaseSession extends Model
         'case_file_id',
         'date',
         'decisions',
-        'notes'
+        'notes',
+        'archived_at'
     ];
 
     protected $casts = [
-        'date' => 'date'
+        'date' => 'datetime',
+        'archived_at' => 'datetime'
     ];
 
     public function caseFile()
